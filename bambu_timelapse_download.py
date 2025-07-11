@@ -7,6 +7,7 @@ import configparser
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
+from tqdm import tqdm
 
 app_name = __name__
 version = '1.0.0.1'
@@ -115,9 +116,22 @@ def ftp_download(args):
                             logger.info(f'Filesize of file {f} is 0, skipping file and continuing...')
                             continue
                         try:
-                            logger.info(f'Downloading file [{index}/{total_files}] "{f}" size: {filesize_mb} MB')
-                            with open(download_file_path, 'wb') as fhandle:
-                                ftp_client.retrbinary('RETR %s' % f, fhandle.write)
+                            logger.info(f'Starting download [{index}/{total_files}] "{f}" size: {filesize_mb} MB')
+                            with open(download_file_path, 'wb') as fhandle, tqdm(
+                                total=filesize,
+                                unit='B',
+                                unit_scale=True,
+                                unit_divisor=1024,
+                                desc=f"[{index}/{total_files}] {f}",
+                                leave=True,
+                                ncols=100
+                            ) as pbar:
+                                def callback(data):
+                                    fhandle.write(data)
+                                    pbar.update(len(data))
+
+                                ftp_client.retrbinary(f'RETR {f}', callback)
+
                             if args.delete_files_from_sd_card_after_download:
                                 try:
                                     ftp_client.delete(f)
